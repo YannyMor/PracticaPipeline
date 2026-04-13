@@ -1,0 +1,48 @@
+name: Blue-Green Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v3
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Leer estado actual y calcular objetivo
+        id: estado
+        run: |
+          CURRENT=$(ssh -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cat /etc/nginx/current_deploy.env | grep CURRENT_COLOR | cut -d'=' -f2")
+          echo "Color actual: $CURRENT"
+          if [ "$CURRENT" == "blue" ]; then
+            TARGET="green"
+          else
+            TARGET="blue"
+          fi
+          echo "Color objetivo: $TARGET"
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+
+      - name: Ejecutar switch en servidor
+        run: |
+          TARGET=${{ steps.estado.outputs.target }}
+          ssh -i ~/.ssh/id_rsa ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            sudo bash /etc/nginx/link-switcher.sh $TARGET
+            echo 'CURRENT_COLOR=$TARGET' | sudo tee /etc/nginx/current_deploy.env
+          "
+
+      - name: Verificar despliegue
+        run: |
+          sleep 3
+          COLOR=$(curl -sI http://${{ secrets.SERVER_HOST }} | grep X-Deployment-Color | tr -d '[:space:]')
+          echo "Header recibido: $COLOR"
