@@ -45,7 +45,7 @@ jobs:
             export DEPLOYMENT_COLOR='$DEPLOYMENT_COLOR'
             envsubst '\${APP_TARGET_IP} \${APP_TARGET_PORT} \${DEPLOYMENT_COLOR}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf
             sudo systemctl reload nginx
-            echo 'CURRENT_COLOR=$TARGET' | sudo tee /etc/nginx/current_deploy.env
+            echo "CURRENT_COLOR=$TARGET" | sudo tee /etc/nginx/current_deploy.env
           "
 
       - name: Verificar despliegue
